@@ -23,7 +23,7 @@ services:
       # Browser settings
       - DISPLAY=:99
       - PLAYWRIGHT_BROWSERS_PATH=/app/.playwright
-    working_directory: /app
+    working_dir: /app
     restart: unless-stopped
     # Override default command if needed
     command: >
@@ -52,7 +52,7 @@ services:
       - CRAWLER_ARGS=--url-file /app/input/targets.txt --fqdn-list --concurrency 3 --output /app/output/domains.txt --log-file /app/logs/crawler.log
       - DISPLAY=:99
       - PLAYWRIGHT_BROWSERS_PATH=/app/.playwright
-    working_directory: /app
+    working_dir: /app
     restart: unless-stopped
     command: >
       sh -c "
