@@ -34,13 +34,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
 COPY domain_crawler.py .
-COPY cron-entrypoint.sh /usr/local/bin/cron-entrypoint.sh
 
 # Create necessary directories and set permissions
 RUN mkdir -p /app/input /app/output /app/logs /app/.browser_data /app/cookies
-
-# Make entrypoint script executable
-RUN chmod +x /usr/local/bin/cron-entrypoint.sh
 
 # Create non-root user for security
 RUN useradd -m -u 1000 crawler

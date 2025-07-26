@@ -55,7 +55,24 @@ services:
       - PLAYWRIGHT_BROWSERS_PATH=/home/crawler/.cache/ms-playwright
     working_dir: /app
     restart: unless-stopped
-    entrypoint: ["/usr/local/bin/cron-entrypoint.sh"]
+    command: >
+      sh -c "
+      echo 'Setting up cron environment...' &&
+      mkdir -p /var/run /var/log &&
+      touch /var/log/cron.log &&
+      if [ -f /etc/cron.d/crawler-cron ]; then
+        echo 'Installing crontab from /etc/cron.d/crawler-cron' &&
+        chmod 0644 /etc/cron.d/crawler-cron &&
+        crontab /etc/cron.d/crawler-cron &&
+        echo 'Crontab installed successfully';
+      else
+        echo 'Warning: No crontab file found at /etc/cron.d/crawler-cron';
+      fi &&
+      mkdir -p /app/output /app/logs /app/.browser_data &&
+      chown -R crawler:crawler /app/output /app/logs /app/.browser_data &&
+      echo 'Starting cron daemon...' &&
+      cron -f
+      "
     profiles:
       - scheduled
 

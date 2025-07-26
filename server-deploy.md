@@ -252,6 +252,10 @@ docker-compose --profile scheduled --profile viewer up -d
 
 # 2. Check cron container logs specifically
 docker-compose logs domain-crawler-cron
+
+# 3. If you see "no such file or directory" errors:
+# The fix is already applied in docker-compose.yml (inline command instead of entrypoint script)
+# Just rebuild and restart as shown above
 ```
 
 ### Browser Issues
