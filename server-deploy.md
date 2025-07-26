@@ -243,6 +243,15 @@ docker-compose --profile scheduled --profile viewer logs
 
 # Check resource usage
 docker stats
+
+# If cron container fails with permission errors:
+# 1. Rebuild containers after cron fix
+docker-compose --profile scheduled --profile viewer down
+docker-compose build --no-cache
+docker-compose --profile scheduled --profile viewer up -d
+
+# 2. Check cron container logs specifically
+docker-compose logs domain-crawler-cron
 ```
 
 ### Browser Issues
