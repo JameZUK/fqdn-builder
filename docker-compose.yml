@@ -62,7 +62,6 @@ services:
       touch /var/log/cron.log &&
       if [ -f /etc/cron.d/crawler-cron ]; then
         echo 'Installing crontab from /etc/cron.d/crawler-cron' &&
-        chmod 0644 /etc/cron.d/crawler-cron &&
         crontab /etc/cron.d/crawler-cron &&
         echo 'Crontab installed successfully';
       else
