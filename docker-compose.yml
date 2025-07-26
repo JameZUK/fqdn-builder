@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  domain-crawler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: domain-crawler
+    volumes:
+      # Mount input files
+      - ./input:/app/input:ro
+      # Mount output directory
+      - ./output:/app/output
+      # Mount logs directory
+      - ./logs:/app/logs
+      # Mount browser data for persistence
+      - ./browser_data:/app/.browser_data
+      # Optional: Mount custom cookies
+      - ./cookies:/app/cookies:ro
+    environment:
+      # Set default arguments (can be overridden)
+      - CRAWLER_ARGS=--url-file /app/input/targets.txt --fqdn-list --concurrency 3 --output /app/output/domains.txt --log-file /app/logs/crawler.log
+      # Browser settings
+      - DISPLAY=:99
+      - PLAYWRIGHT_BROWSERS_PATH=/app/.playwright
+    working_directory: /app
+    restart: unless-stopped
+    # Override default command if needed
+    command: >
+      sh -c "
+      echo 'Starting Domain Crawler...' &&
+      python domain_crawler.py $${CRAWLER_ARGS}
+      "
+    # For scheduled runs (optional)
+    profiles:
+      - manual
+
+  # Optional: Scheduled crawler runs using cron
+  domain-crawler-cron:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: domain-crawler-cron
+    volumes:
+      - ./input:/app/input:ro
+      - ./output:/app/output
+      - ./logs:/app/logs
+      - ./browser_data:/app/.browser_data
+      - ./cookies:/app/cookies:ro
+      - ./crontab:/etc/cron.d/crawler-cron:ro
+    environment:
+      - CRAWLER_ARGS=--url-file /app/input/targets.txt --fqdn-list --concurrency 3 --output /app/output/domains.txt --log-file /app/logs/crawler.log
+      - DISPLAY=:99
+      - PLAYWRIGHT_BROWSERS_PATH=/app/.playwright
+    working_directory: /app
+    restart: unless-stopped
+    command: >
+      sh -c "
+      echo 'Setting up cron job...' &&
+      crontab /etc/cron.d/crawler-cron &&
+      echo 'Starting cron daemon...' &&
+      cron -f
+      "
+    profiles:
+      - scheduled
+
+  # Optional: Web interface for results viewing
+  results-viewer:
+    image: nginx:alpine
+    container_name: domain-results-viewer
+    ports:
+      - "8080:80"
+    volumes:
+      - ./output:/usr/share/nginx/html/output:ro
+      - ./logs:/usr/share/nginx/html/logs:ro
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    restart: unless-stopped
+    profiles:
+      - viewer
+
+networks:
+  default:
+    name: domain-crawler-network

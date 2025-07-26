@@ -1,0 +1,8 @@
+# Sample target URLs for domain discovery
+# One URL per line, comments start with #
+
+https://www.reddit.com
+https://www.facebook.com
+https://www.google.com
+https://www.microsoft.com
+https://www.apple.com
