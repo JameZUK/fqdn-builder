@@ -453,10 +453,14 @@ async def validate_existing_domains(existing_domains):
     
     return valid_domains, dead_domains
 
-def should_skip_url_based_on_existing_domains(url, existing_domains):
+def should_skip_url_based_on_existing_domains(url, existing_domains, dual_stack_mode=False):
     """Determine if a URL should be skipped because we already know its domains."""
     parsed_url = urlparse(url)
     domain = parsed_url.netloc.replace('www.', '')
+    
+    # In dual-stack mode, don't skip URLs since IPv4/IPv6 might reveal different domains
+    if dual_stack_mode:
+        return False, None
     
     # If the main domain is already known, we likely have most of its subdomains
     if domain in existing_domains:
@@ -907,7 +911,7 @@ async def main():
     skipped_urls = []
     
     for url in urls_to_process:
-        should_skip, reason = should_skip_url_based_on_existing_domains(url, existing_domains)
+        should_skip, reason = should_skip_url_based_on_existing_domains(url, existing_domains, args.dual_stack)
         if should_skip:
             skipped_urls.append((url, reason))
             print(f"⏭️  Skipping {url}: {reason}")
