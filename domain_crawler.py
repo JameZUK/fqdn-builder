@@ -507,7 +507,7 @@ async def update_output_file_incrementally(output_file, new_domains, existing_do
                 f.write(f"# Script Configuration:\n")
                 f.write(f"#   Headless mode: {args.headless}\n")
                 f.write(f"#   Cookie persistence: {not args.no_persist_cookies}\n")
-                f.write(f"#   IPv6 support: {args.ipv6}\n")
+                f.write(f"#   Dual-stack mode: {args.dual_stack}\n")
                 if args.url_file:
                     f.write(f"#   URL file: {args.url_file}\n")
                 if args.cookies:
@@ -538,6 +538,7 @@ async def update_output_file_incrementally(output_file, new_domains, existing_do
                 f.write(f"#   Max pages per site: {args.pages}\n")
                 f.write(f"#   Headless mode: {args.headless}\n")
                 f.write(f"#   Cookie persistence: {not args.no_persist_cookies}\n")
+                f.write(f"#   Dual-stack mode: {args.dual_stack}\n")
                 f.write(f"# ================================================\n\n")
                 
                 f.write("## Summary\n")
@@ -580,166 +581,223 @@ async def process_single_url(url, url_index, total_urls, args, semaphore):
         print(f"🔄 Processing URL {url_index + 1}/{total_urls}: {url}")
         print(f"{'='*60}")
         
-        # Set up persistent storage for this URL
-        storage_state_file = None
-        if not args.no_persist_cookies:
-            storage_dir = os.path.join(os.getcwd(), '.browser_data')
-            os.makedirs(storage_dir, exist_ok=True)
+        # If dual-stack is enabled, crawl both IPv4 and IPv6
+        if args.dual_stack:
+            print(f"🌐 Dual-stack mode: Crawling both IPv4 and IPv6")
             
-            domain = urlparse(url).netloc.replace('www.', '')
-            storage_state_file = os.path.join(storage_dir, f'{domain}_storage.json')
+            ipv4_result = await process_single_url_with_ip_version(url, url_index, total_urls, args, "ipv4")
+            ipv6_result = await process_single_url_with_ip_version(url, url_index, total_urls, args, "ipv6")
             
-            if args.clear_cookies and os.path.exists(storage_state_file):
-                os.remove(storage_state_file)
-                print(f"🧹 Cleared existing browser data for {domain}")
-            
-            if os.path.exists(storage_state_file):
-                print(f"🍪 Loading existing browser data from {storage_state_file}")
-            else:
-                print(f"🍪 Creating new browser data file: {storage_state_file}")
-        
-        # Launch browser for this URL
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=args.headless,
-                args=[
-                    '--no-sandbox',
-                    '--disable-blink-features=AutomationControlled',
-                    '--disable-extensions',
-                    '--disable-web-security',
-                    '--disable-features=VizDisplayCompositor',
-                    '--no-first-run',
-                    '--disable-infobars',
-                    '--disable-notifications'
-                ]
-            )
-            
-            try:
-                # Create context with storage state
-                context_options = {
-                    'user_agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'viewport': {'width': 1366, 'height': 768},
-                    'ignore_https_errors': True,
+            # Combine results from both IP versions
+            if ipv4_result and ipv6_result:
+                combined_result = {
+                    'url': url,
+                    'subdomains': sorted(list(set(ipv4_result['subdomains'] + ipv6_result['subdomains']))),
+                    'external_domains': sorted(list(set(ipv4_result['external_domains'] + ipv6_result['external_domains']))),
+                    'related_domains': sorted(list(set(ipv4_result['related_domains'] + ipv6_result['related_domains']))),
+                    'parent_domains': sorted(list(set(ipv4_result['parent_domains'] + ipv6_result['parent_domains']))),
+                    'consolidated_fqdns': set(ipv4_result['consolidated_fqdns']) | set(ipv6_result['consolidated_fqdns'])
                 }
                 
-                if storage_state_file and os.path.exists(storage_state_file):
-                    context_options['storage_state'] = storage_state_file
+                print(f"\n📊 Combined Results for {url}:")
+                print(f"  • IPv4 domains: {len(ipv4_result['consolidated_fqdns'])}")
+                print(f"  • IPv6 domains: {len(ipv6_result['consolidated_fqdns'])}")
+                print(f"  • Total unique domains: {len(combined_result['consolidated_fqdns'])}")
                 
-                context = await browser.new_context(**context_options)
-                page = await context.new_page()
-                
-                # Import cookies if provided (for first URL only)
-                if args.cookies and url_index == 0:
-                    try:
-                        print(f"🍪 Loading cookies from {args.cookies}...")
-                        with open(args.cookies, 'r') as f:
-                            cookies_data = json.load(f)
-                        
-                        playwright_cookies = []
-                        for cookie in cookies_data:
-                            playwright_cookie = {
-                                'name': cookie['name'],
-                                'value': cookie['value'],
-                                'domain': cookie['domain'],
-                                'path': cookie.get('path', '/'),
-                                'secure': cookie.get('secure', False),
-                                'httpOnly': cookie.get('httpOnly', False),
-                            }
-                            
-                            if cookie.get('expirationDate') and not cookie.get('session', False):
-                                playwright_cookie['expires'] = int(cookie['expirationDate'])
-                            
-                            same_site = cookie.get('sameSite')
-                            if same_site:
-                                if same_site == 'no_restriction':
-                                    playwright_cookie['sameSite'] = 'None'
-                                elif same_site in ['strict', 'lax']:
-                                    playwright_cookie['sameSite'] = same_site.capitalize()
-                            
-                            playwright_cookies.append(playwright_cookie)
-                        
-                        await context.add_cookies(playwright_cookies)
-                        print(f"   ✅ Successfully imported {len(playwright_cookies)} cookies")
-                        
-                        if storage_state_file:
-                            try:
-                                await context.storage_state(path=storage_state_file)
-                                print(f"   💾 Imported cookies saved to persistent storage: {storage_state_file}")
-                            except Exception as e:
-                                print(f"   ⚠️  Warning: Could not save imported cookies: {e}")
-                                
-                    except FileNotFoundError:
-                        print(f"   ❌ Cookie file not found: {args.cookies}")
-                        return None
-                    except json.JSONDecodeError as e:
-                        print(f"   ❌ Invalid JSON in cookie file: {e}")
-                        return None
-                    except Exception as e:
-                        print(f"   ❌ Error importing cookies: {e}")
-                        return None
-                
+                return combined_result
+            elif ipv4_result:
+                print(f"⚠️  IPv6 failed, using IPv4 results only")
+                return ipv4_result
+            elif ipv6_result:
+                print(f"⚠️  IPv4 failed, using IPv6 results only")
+                return ipv6_result
+            else:
+                print(f"❌ Both IPv4 and IPv6 failed")
+                return None
+        else:
+            # Single IP version mode (existing behavior)
+            return await process_single_url_with_ip_version(url, url_index, total_urls, args, None)
+
+async def process_single_url_with_ip_version(url, url_index, total_urls, args, ip_version):
+    """Process a single URL with a specific IP version."""
+    ip_label = f" ({ip_version.upper()})" if ip_version else ""
+    print(f"🔗 Connecting to {url}{ip_label}...")
+    
+    # Set up persistent storage for this URL
+    storage_state_file = None
+    if not args.no_persist_cookies:
+        storage_dir = os.path.join(os.getcwd(), '.browser_data')
+        os.makedirs(storage_dir, exist_ok=True)
+        
+        domain = urlparse(url).netloc.replace('www.', '')
+        storage_state_file = os.path.join(storage_dir, f'{domain}_storage.json')
+        
+        if args.clear_cookies and os.path.exists(storage_state_file):
+            os.remove(storage_state_file)
+            print(f"🧹 Cleared existing browser data for {domain}")
+        
+        if os.path.exists(storage_state_file):
+            print(f"🍪 Loading existing browser data from {storage_state_file}")
+        else:
+            print(f"🍪 Creating new browser data file: {storage_state_file}")
+    
+    # Launch browser for this URL
+    async with async_playwright() as p:
+        # Configure browser launch arguments for IP version
+        browser_args = [
+            '--no-sandbox',
+            '--disable-blink-features=AutomationControlled',
+            '--disable-extensions',
+            '--disable-web-security',
+            '--disable-features=VizDisplayCompositor',
+            '--no-first-run',
+            '--disable-infobars',
+            '--disable-notifications'
+        ]
+        
+        # Add IP version specific arguments
+        if ip_version == "ipv4":
+            browser_args.extend([
+                '--disable-ipv6',
+                '--force-ipv4-only'
+            ])
+        elif ip_version == "ipv6":
+            browser_args.extend([
+                '--disable-ipv4',
+                '--force-ipv6-only'
+            ])
+        
+        browser = await p.chromium.launch(
+            headless=args.headless,
+            args=browser_args
+        )
+        
+        try:
+            # Create context with storage state
+            context_options = {
+                'user_agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'viewport': {'width': 1366, 'height': 768},
+                'ignore_https_errors': True,
+            }
+            
+            if storage_state_file and os.path.exists(storage_state_file):
+                context_options['storage_state'] = storage_state_file
+            
+            context = await browser.new_context(**context_options)
+            page = await context.new_page()
+            
+            # Import cookies if provided (for first URL only)
+            if args.cookies and url_index == 0:
                 try:
-                    print("1. Loading initial page...")
-                    print(f"   Loading {url}...")
-                    response = await page.goto(url, wait_until='domcontentloaded', timeout=30000)
-                    print(f"   -> Status: {response.status if response else 'unknown'}")
+                    print(f"🍪 Loading cookies from {args.cookies}...")
+                    with open(args.cookies, 'r') as f:
+                        cookies_data = json.load(f)
                     
-                    if not response or response.status >= 400:
-                        print(f"   -> Failed to load {url}")
-                        return None
+                    playwright_cookies = []
+                    for cookie in cookies_data:
+                        playwright_cookie = {
+                            'name': cookie['name'],
+                            'value': cookie['value'],
+                            'domain': cookie['domain'],
+                            'path': cookie.get('path', '/'),
+                            'secure': cookie.get('secure', False),
+                            'httpOnly': cookie.get('httpOnly', False),
+                        }
+                        
+                        if cookie.get('expirationDate') and not cookie.get('session', False):
+                            playwright_cookie['expires'] = int(cookie['expirationDate'])
+                        
+                        same_site = cookie.get('sameSite')
+                        if same_site:
+                            if same_site == 'no_restriction':
+                                playwright_cookie['sameSite'] = 'None'
+                            elif same_site in ['strict', 'lax']:
+                                playwright_cookie['sameSite'] = same_site.capitalize()
+                        
+                        playwright_cookies.append(playwright_cookie)
                     
-                    # Check for embedded config
-                    html_content = await page.content()
-                    embedded_domains = find_embedded_domains(html_content)
+                    await context.add_cookies(playwright_cookies)
+                    print(f"   ✅ Successfully imported {len(playwright_cookies)} cookies")
                     
-                    if embedded_domains:
-                        print("✅ Success! Found embedded domain config.")
-                        subdomains = embedded_domains
-                        external_domains = []
-                    else:
-                        print("2. No config found. Falling back to crawler...")
-                        subdomains, external_domains = await crawl_domains(url, args.pages, page)
-                    
-                    # Get base domain for categorization
-                    base_domain = urlparse(url).netloc.replace('www.', '')
-                    
-                    # Categorize domains for this URL
-                    if external_domains:
-                        related_domains, third_party_domains, parent_domains = categorize_domains(base_domain, subdomains, external_domains)
-                    else:
-                        related_domains, third_party_domains, parent_domains = [], [], []
-                    
-                    # Create consolidated FQDN list for this URL
-                    url_consolidated_fqdns = set(subdomains + parent_domains + related_domains + [base_domain])
-                    
-                    print(f"\n📊 Results for {url}:")
-                    print(f"  • Subdomains: {len(subdomains)}")
-                    print(f"  • Related domains: {len(related_domains)}")
-                    print(f"  • Organization FQDNs: {len(url_consolidated_fqdns)}")
-                    
-                    return {
-                        'url': url,
-                        'subdomains': subdomains,
-                        'external_domains': external_domains,
-                        'related_domains': related_domains,
-                        'parent_domains': parent_domains,
-                        'consolidated_fqdns': url_consolidated_fqdns
-                    }
-                    
-                except Exception as e:
-                    print(f"❌ Error processing {url}: {e}")
-                    return None
-                finally:
-                    # Save storage state
                     if storage_state_file:
                         try:
                             await context.storage_state(path=storage_state_file)
-                            print(f"🍪 Browser data saved to {storage_state_file}")
+                            print(f"   💾 Imported cookies saved to persistent storage: {storage_state_file}")
                         except Exception as e:
-                            print(f"⚠️  Warning: Could not save browser data: {e}")
+                            print(f"   ⚠️  Warning: Could not save imported cookies: {e}")
                             
+                except FileNotFoundError:
+                    print(f"   ❌ Cookie file not found: {args.cookies}")
+                    return None
+                except json.JSONDecodeError as e:
+                    print(f"   ❌ Invalid JSON in cookie file: {e}")
+                    return None
+                except Exception as e:
+                    print(f"   ❌ Error importing cookies: {e}")
+                    return None
+            
+            try:
+                print("1. Loading initial page...")
+                print(f"   Loading {url}...")
+                response = await page.goto(url, wait_until='domcontentloaded', timeout=30000)
+                print(f"   -> Status: {response.status if response else 'unknown'}")
+                
+                if not response or response.status >= 400:
+                    print(f"   -> Failed to load {url}")
+                    return None
+                
+                # Check for embedded config
+                html_content = await page.content()
+                embedded_domains = find_embedded_domains(html_content)
+                
+                if embedded_domains:
+                    print("✅ Success! Found embedded domain config.")
+                    subdomains = embedded_domains
+                    external_domains = []
+                else:
+                    print("2. No config found. Falling back to crawler...")
+                    subdomains, external_domains = await crawl_domains(url, args.pages, page)
+                
+                # Get base domain for categorization
+                base_domain = urlparse(url).netloc.replace('www.', '')
+                
+                # Categorize domains for this URL
+                if external_domains:
+                    related_domains, third_party_domains, parent_domains = categorize_domains(base_domain, subdomains, external_domains)
+                else:
+                    related_domains, third_party_domains, parent_domains = [], [], []
+                
+                # Create consolidated FQDN list for this URL
+                url_consolidated_fqdns = set(subdomains + parent_domains + related_domains + [base_domain])
+                
+                print(f"\n📊 Results for {url}{ip_label}:")
+                print(f"  • Subdomains: {len(subdomains)}")
+                print(f"  • Related domains: {len(related_domains)}")
+                print(f"  • Organization FQDNs: {len(url_consolidated_fqdns)}")
+                
+                return {
+                    'url': url,
+                    'subdomains': subdomains,
+                    'external_domains': external_domains,
+                    'related_domains': related_domains,
+                    'parent_domains': parent_domains,
+                    'consolidated_fqdns': url_consolidated_fqdns
+                }
+                
+            except Exception as e:
+                print(f"❌ Error processing {url}{ip_label}: {e}")
+                return None
             finally:
-                await browser.close()
+                # Save storage state
+                if storage_state_file:
+                    try:
+                        await context.storage_state(path=storage_state_file)
+                        print(f"🍪 Browser data saved to {storage_state_file}")
+                    except Exception as e:
+                        print(f"⚠️  Warning: Could not save browser data: {e}")
+                        
+        finally:
+            await browser.close()
 
 async def main():
     parser = argparse.ArgumentParser(description="Finds domains using config extraction with a crawler fallback.")
@@ -749,6 +807,7 @@ async def main():
     parser.add_argument("--headless", action="store_true", default=True, help="Run browser in headless mode (default).")
     parser.add_argument("--no-headless", action="store_false", dest="headless", help="Run browser with UI visible.")
     parser.add_argument("--ipv6", action="store_true", help="Alternate between IPv4 and IPv6 for retry attempts.")
+    parser.add_argument("--dual-stack", action="store_true", help="Crawl each URL using both IPv4 and IPv6 for complete domain discovery.")
     parser.add_argument("--no-persist-cookies", action="store_true", help="Disable storing cookies and browser data between sessions.")
     parser.add_argument("--clear-cookies", action="store_true", help="Clear stored cookies and browser data before starting.")
     parser.add_argument("--manual-login", action="store_true", help="Pause after loading page to allow manual login before crawling.")
@@ -1020,6 +1079,8 @@ async def main():
     print(f"  • Total unique subdomains: {len(final_subdomains)}")
     print(f"  • Total unique external domains: {len(final_external_domains)}")
     print(f"  • Total organization FQDNs: {len(final_consolidated_fqdns)}")
+    if args.dual_stack:
+        print(f"  • Dual-stack mode: IPv4 and IPv6 crawling enabled")
     
     # Output consolidated FQDN list if requested
     if args.fqdn_list:

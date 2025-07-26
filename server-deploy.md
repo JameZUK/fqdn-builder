@@ -103,6 +103,10 @@ nano crontab
 # Override default settings
 CRAWLER_ARGS="--url-file /app/input/targets.txt --concurrency 5 --output /app/output/domains.txt --log-file /app/logs/custom.log" \
 docker-compose --profile scheduled --profile viewer up -d
+
+# Enable dual-stack IPv4/IPv6 for comprehensive domain discovery
+CRAWLER_ARGS="--url-file /app/input/targets.txt --dual-stack --concurrency 3 --output /app/output/domains.txt --log-file /app/logs/dual-stack.log" \
+docker-compose --profile scheduled --profile viewer up -d
 ```
 
 ### Custom Ports
@@ -133,6 +137,14 @@ docker-compose run --rm domain-crawler python domain_crawler.py \
   --fqdn-list \
   --output /app/output/manual-$(date +%Y%m%d).txt \
   --log-file /app/logs/manual-$(date +%Y%m%d-%H%M).log
+
+# Manual run with dual-stack for comprehensive discovery
+docker-compose run --rm domain-crawler python domain_crawler.py \
+  --url-file /app/input/targets.txt \
+  --dual-stack \
+  --fqdn-list \
+  --output /app/output/dual-stack-$(date +%Y%m%d).txt \
+  --log-file /app/logs/dual-stack-$(date +%Y%m%d-%H%M).log
 ```
 
 ### Update Target URLs

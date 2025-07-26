@@ -4,6 +4,7 @@ An intelligent domain discovery tool that extracts embedded domain configuration
 
 ## 🚀 Key Features
 
+- **🌐 Dual-Stack IPv4/IPv6 Discovery**: Crawl each URL using both IPv4 and IPv6 for complete domain discovery
 - **🧠 Intelligent Output Management**: Loads existing domains, validates via DNS, and only crawls new targets
 - **📝 Comprehensive Logging**: Full logging support for unattended runs
 - **🐳 Docker Deployment**: Complete containerization with scheduled runs and web viewing
@@ -90,6 +91,28 @@ python domain_crawler.py \
 # 6. Log everything to timestamped log file
 ```
 
+### Dual-Stack IPv4/IPv6 Discovery
+```bash
+# Comprehensive domain discovery using both IPv4 and IPv6
+python domain_crawler.py https://reddit.com --dual-stack --fqdn-list -o domains.txt
+
+# Example output showing enhanced discovery:
+# 🌐 Dual-stack mode: Crawling both IPv4 and IPv6
+# 🔗 Connecting to https://reddit.com (IPV4)...
+# 📊 Results for https://reddit.com (IPV4): 45 domains
+# 🔗 Connecting to https://reddit.com (IPV6)...
+# 📊 Results for https://reddit.com (IPV6): 52 domains
+# 📊 Combined Results: 67 unique domains total
+
+# Batch processing with dual-stack for maximum discovery
+python domain_crawler.py --url-file targets.txt --dual-stack --concurrency 2 \
+  --fqdn-list -o comprehensive-domains.txt
+
+# Docker deployment with dual-stack enabled
+docker-compose run domain-crawler --url-file input/targets.txt --dual-stack \
+  --fqdn-list -o output/dual-stack-domains.txt
+```
+
 ### Efficiency Example
 ```bash
 # First run: Discovers 200 domains from 10 URLs (10 minutes)
@@ -124,6 +147,7 @@ python domain_crawler.py --url-file targets.txt --fqdn-list -o domains.txt
 
 ### Advanced Options
 - `--ipv6`: Enable IPv6 for retry attempts
+- `--dual-stack`: Crawl each URL using both IPv4 and IPv6 for complete domain discovery
 
 ## 📄 Output File Format
 
