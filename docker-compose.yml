@@ -22,7 +22,7 @@ services:
       - CRAWLER_ARGS=--url-file /app/input/targets.txt --fqdn-list --concurrency 3 --output /app/output/domains.txt --log-file /app/logs/crawler.log
       # Browser settings
       - DISPLAY=:99
-      - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+      - PLAYWRIGHT_BROWSERS_PATH=/home/crawler/.cache/ms-playwright
     working_dir: /app
     restart: unless-stopped
     # Override default command if needed
@@ -51,7 +51,7 @@ services:
     environment:
       - CRAWLER_ARGS=--url-file /app/input/targets.txt --fqdn-list --concurrency 3 --output /app/output/domains.txt --log-file /app/logs/crawler.log
       - DISPLAY=:99
-      - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+      - PLAYWRIGHT_BROWSERS_PATH=/home/crawler/.cache/ms-playwright
     working_dir: /app
     restart: unless-stopped
     command: >

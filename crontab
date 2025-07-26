@@ -5,7 +5,7 @@
 0 2 * * * cd /app && python domain_crawler.py --url-file /app/input/targets.txt --fqdn-list --concurrency 3 --output /app/output/domains.txt --log-file /app/logs/daily-$(date +\%Y\%m\%d).log
 
 # Run weekly on Sunday at 3 AM for full validation
-0 3 * * 0 cd /app && python domain_crawler.py --url-file /app/input/targets.txt --fqdn-list --concurrency 5 --output /app/output/domains.txt --log-file /app/logs/weekly-$(date +\%Y\%m\%d).log --clear-cookies
+#0 3 * * 0 cd /app && python domain_crawler.py --url-file /app/input/targets.txt --fqdn-list --concurrency 5 --output /app/output/domains.txt --log-file /app/logs/weekly-$(date +\%Y\%m\%d).log --clear-cookies
 
 # Example: Run every 6 hours
 # 0 */6 * * * cd /app && python domain_crawler.py --url-file /app/input/targets.txt --fqdn-list --concurrency 3 --output /app/output/domains.txt --log-file /app/logs/hourly-$(date +\%Y\%m\%d-\%H).log

@@ -41,8 +41,7 @@ RUN mkdir -p /app/input /app/output /app/logs /app/.browser_data /app/cookies
 # Create non-root user for security
 RUN useradd -m -u 1000 crawler
 
-# Install Playwright browsers as root (before switching users)
-RUN playwright install chromium
+# Install system dependencies for Playwright
 RUN playwright install-deps
 
 # Set ownership of app directory to crawler user
@@ -51,9 +50,12 @@ RUN chown -R crawler:crawler /app
 # Switch to non-root user
 USER crawler
 
+# Install Playwright browsers as the crawler user
+RUN playwright install chromium
+
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+ENV PLAYWRIGHT_BROWSERS_PATH=/home/crawler/.cache/ms-playwright
 
 # Default command (can be overridden)
 CMD ["python", "domain_crawler.py", "--help"]
