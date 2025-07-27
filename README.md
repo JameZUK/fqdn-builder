@@ -6,13 +6,14 @@ An intelligent domain discovery tool that extracts embedded domain configuration
 
 - **🌐 Dual-Stack IPv4/IPv6 Discovery**: Crawl each URL using both IPv4 and IPv6 for complete domain discovery
 - **🧠 Intelligent Output Management**: Loads existing domains, validates via DNS, and only crawls new targets
-- **📝 Comprehensive Logging**: Full logging support for unattended runs
+- **📝 Enhanced Structured Logging**: Website-specific loggers with colored output, processing phases, and verbose debugging
 - **🐳 Docker Deployment**: Complete containerization with scheduled runs and web viewing
 - **⚡ Concurrent Processing**: Process multiple URLs simultaneously with configurable concurrency
 - **🔍 DNS Validation**: Automatically removes dead domains and validates existing ones
 - **📊 Smart URL Skipping**: Skips URLs with already-known domains for massive efficiency gains
 - **🍪 Cookie Persistence**: Maintains login sessions between runs
 - **🎯 FQDN Output**: Clean domain lists perfect for security tools
+- **📊 Real-time Progress Tracking**: Live status updates for each website being processed
 
 ## 📋 Quick Start
 
@@ -137,6 +138,7 @@ python domain_crawler.py --url-file targets.txt --fqdn-list -o domains.txt
 
 ### Logging & Monitoring
 - `--log-file`: Path to log file for unattended runs
+- `--verbose, -v`: Enable verbose logging (DEBUG level) for detailed debugging
 - `--headless/--no-headless`: Browser visibility (default: headless)
 
 ### Session Management
@@ -290,17 +292,98 @@ docker-compose run -v $(pwd)/my-targets.txt:/app/input/targets.txt domain-crawle
 7. **Domain Categorization**: Separate organization vs third-party domains
 8. **Incremental Updates**: Only write new/changed domains
 
-## 📝 Logging
+## 📝 Enhanced Logging System
 
-All operations are logged with timestamps for audit trails:
+The domain crawler features a sophisticated logging system designed for monitoring and debugging:
+
+### Website-Specific Logging
+Each website gets its own logger with contextual information:
 
 ```bash
-2025-01-15 14:30:15,123 - INFO - Domain crawler started
-2025-01-15 14:30:15,124 - INFO - Arguments: {'url_file': 'targets.txt', 'concurrency': 3, ...}
-2025-01-15 14:30:20,456 - INFO - Loaded 247 existing domains from domains.txt
-2025-01-15 14:30:25,789 - INFO - Skipped 8/10 URLs with known domains
-2025-01-15 14:30:30,123 - INFO - Updated output file: domains.txt
-2025-01-15 14:30:30,124 - INFO - Added 12 new domains, removed 2 dead domains
+2025-01-27 12:30:15,123 - crawler.reddit.com - INFO - [reddit.com] Starting processing [1/3]
+2025-01-27 12:30:16,234 - crawler.reddit.com - INFO - [reddit.com] Phase 1: Loading initial page...
+2025-01-27 12:30:18,345 - crawler.reddit.com - INFO - [reddit.com] Initial page loaded - Status: 200
+2025-01-27 12:30:19,456 - crawler.reddit.com - INFO - [reddit.com] Phase 2: Checking for embedded domain configuration...
+2025-01-27 12:30:20,567 - crawler.reddit.com - INFO - [reddit.com] Phase 3: No embedded config found, starting crawler...
+2025-01-27 12:30:21,678 - crawler.reddit.com - INFO - [reddit.com] Starting crawl - Target: 10 pages, Rate limit: 2.0s
+2025-01-27 12:30:22,789 - crawler.reddit.com - INFO - [reddit.com] Crawling page 1/10: https://reddit.com
+2025-01-27 12:30:25,890 - crawler.reddit.com - INFO - [reddit.com] Page 1 processed: 45 links, 8 new internal, 3 new external domains
+2025-01-27 12:30:30,123 - crawler.reddit.com - INFO - [reddit.com] Results Summary: • Subdomains: 15 • Related domains: 8 • Organization FQDNs: 23
+2025-01-27 12:30:30,234 - crawler.reddit.com - INFO - [reddit.com] Processing completed successfully
+```
+
+### Processing Phases
+Clear separation of processing phases for easy tracking:
+
+- **Phase 1**: Initial page loading and connection status
+- **Phase 2**: Embedded domain configuration detection
+- **Phase 3**: Fallback crawling with page-by-page progress
+- **Phase 4**: Domain categorization and results compilation
+
+### Verbose Debug Mode
+Use `--verbose` for detailed debugging information:
+
+```bash
+# Enable detailed debugging
+python domain_crawler.py https://example.com --verbose --log-file debug.log
+
+# Example verbose output:
+2025-01-27 12:30:15,123 - DEBUG - [example.com] Launching browser with 8 arguments
+2025-01-27 12:30:16,234 - DEBUG - [example.com] Loading existing browser data from /app/.browser_data/example.com_storage.json
+2025-01-27 12:30:17,345 - DEBUG - [example.com] Navigating to https://example.com (timeout: 30s)
+2025-01-27 12:30:18,456 - DEBUG - [example.com] Response status: 200
+2025-01-27 12:30:19,567 - DEBUG - [example.com] Base domain: example.com
+2025-01-27 12:30:20,678 - DEBUG - [example.com] Applying rate limit delay: 2.0s
+2025-01-27 12:30:22,789 - DEBUG - [example.com] New subdomain found: cdn.example.com
+2025-01-27 12:30:23,890 - DEBUG - [example.com] New external domain found: analytics.google.com
+2025-01-27 12:30:25,123 - DEBUG - [example.com] Browser data saved to /app/.browser_data/example.com_storage.json
+2025-01-27 12:30:25,234 - DEBUG - [example.com] Browser closed
+```
+
+### Concurrent Processing Logs
+Track multiple websites being processed simultaneously:
+
+```bash
+2025-01-27 12:30:15,123 - INFO - Concurrent processing enabled: 3 browser instances
+2025-01-27 12:30:16,234 - crawler.reddit.com - INFO - [reddit.com] Starting processing [1/3]
+2025-01-27 12:30:16,345 - crawler.facebook.com - INFO - [facebook.com] Starting processing [2/3]
+2025-01-27 12:30:16,456 - crawler.google.com - INFO - [google.com] Starting processing [3/3]
+2025-01-27 12:30:45,123 - INFO - Concurrent processing completed: 3/3 URLs processed successfully
+```
+
+### Efficiency Tracking
+Monitor performance optimizations and skipped operations:
+
+```bash
+2025-01-27 12:30:15,123 - INFO - Loaded 247 existing domains from domains.txt
+2025-01-27 12:30:20,456 - INFO - Skipping reddit.com: main domain reddit.com already in existing domains
+2025-01-27 12:30:21,567 - INFO - Efficiency: Skipped 8/10 URLs with known domains
+2025-01-27 12:30:25,789 - INFO - Crawling efficiency: Skipped 23 similar/duplicate URLs
+2025-01-27 12:30:30,123 - INFO - Excluded 2 domains that don't resolve in DNS
+```
+
+### Colored Console Output
+The console features color-coded output for better readability:
+
+- 🟢 **Green**: Successful operations and info messages
+- 🟡 **Yellow**: Warnings and skipped operations
+- 🔴 **Red**: Errors and failures
+- 🔵 **Cyan**: Debug information
+- 🟣 **Magenta**: Critical issues
+
+### Log File Integration
+All console output is simultaneously written to log files for audit trails:
+
+```bash
+# Run with logging to file
+python domain_crawler.py --url-file targets.txt --log-file logs/crawler-$(date +%Y%m%d).log
+
+# The log file contains:
+# - All console output without colors
+# - Detailed timestamps
+# - Full configuration at startup
+# - Complete error tracebacks
+# - Performance metrics
 ```
 
 ## 🛠️ Requirements

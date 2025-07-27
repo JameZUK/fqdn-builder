@@ -18,8 +18,8 @@ services:
       # Optional: Mount custom cookies
       - ./cookies:/app/cookies:ro
     environment:
-      # Set default arguments (can be overridden)
-      - CRAWLER_ARGS=--url-file /app/input/targets.txt --fqdn-list --concurrency 3 --output /app/output/domains.txt --log-file /app/logs/crawler.log
+      # Set default arguments (can be overridden) - includes enhanced logging
+      - CRAWLER_ARGS=--url-file /app/input/targets.txt --fqdn-list --concurrency 3 --output /app/output/domains.txt --log-file /app/logs/crawler.log --verbose
       # Browser settings
       - DISPLAY=:99
       - PLAYWRIGHT_BROWSERS_PATH=/home/crawler/.cache/ms-playwright
@@ -50,7 +50,7 @@ services:
       - ./cookies:/app/cookies:ro
       - ./crontab:/etc/cron.d/crawler-cron:ro
     environment:
-      - CRAWLER_ARGS=--url-file /app/input/targets.txt --fqdn-list --concurrency 3 --output /app/output/domains.txt --log-file /app/logs/crawler.log
+      - CRAWLER_ARGS=--url-file /app/input/targets.txt --fqdn-list --concurrency 3 --output /app/output/domains.txt --log-file /app/logs/crawler.log --verbose
       - DISPLAY=:99
       - PLAYWRIGHT_BROWSERS_PATH=/home/crawler/.cache/ms-playwright
     working_dir: /app
